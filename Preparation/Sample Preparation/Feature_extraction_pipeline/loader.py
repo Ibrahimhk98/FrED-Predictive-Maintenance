@@ -14,19 +14,49 @@ from pathlib import Path
 from typing import Tuple, List
 import numpy as np
 import soundfile as sf
+import librosa
+
+# Target sample rate for all pipeline audio
+TARGET_SAMPLE_RATE = 40000
 
 
-def load_long_audio(path: Path) -> Tuple[np.ndarray, int]:
+def load_long_audio(path: Path, target_sr: int = TARGET_SAMPLE_RATE) -> Tuple[np.ndarray, int]:
     """Load a long audio file and return mono numpy array and sample rate.
+
+    This function guarantees the returned audio is mono and resampled to ``target_sr``Hz.
 
     Args:
         path: Path to audio file
+        target_sr: desired sample rate for returned audio (default: TARGET_SAMPLE_RATE)
+
     Returns:
-        data (1-D numpy array), sample_rate (int)
+        data (1-D numpy array, dtype=float32), sample_rate (int)
     """
     data, sr = sf.read(str(path))
+    # convert multi-channel to mono
     if data.ndim > 1:
+        # average across channels
         data = np.mean(data, axis=1)
+
+    # ensure floating point array
+    data = np.asarray(data, dtype=np.float32)
+
+    # resample if needed
+    if sr != target_sr:
+        try:
+            data = librosa.resample(data, orig_sr=sr, target_sr=target_sr)
+            sr = target_sr
+        except Exception:
+            # fallback: if librosa fails, attempt scipy (if available) or return original
+            try:
+                from scipy.signal import resample
+                num = int(len(data) * float(target_sr) / float(sr))
+                data = resample(data, num)
+                sr = target_sr
+            except Exception:
+                # if resampling fails, return original data and sr
+                pass
+
     return data, sr
 
 
