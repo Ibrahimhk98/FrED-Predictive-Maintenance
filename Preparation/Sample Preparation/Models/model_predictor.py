@@ -1,17 +1,5 @@
 """Unified model prediction utilities for batch and streaming audio.
-
-Provides:
-  * ModelPredictor: encapsulates a trained classifier + optional scaler and feature extractor
-  * select_best_model(results): choose best model from a training results dict (expects 'models' + 'metrics')
-  * apply_model_to_file(...): convenience wrapper for single audio file inference
-  * stream_predict_from_audio(...): simulate streaming predictions from a long audio array
-
-Design notes:
-  * Feature extractor signature expected: extractor(path_or_none, segment_seconds, overlap, feature_level, audio_data=None, sr=None)
-    returning a dict with at least {'train': {'X': ndarray, 'y': labels?}}
-  * For models lacking predict_proba, a majority vote across segment predictions is used and confidence is approximated.
-  * Streaming uses a deque to maintain the last N predictions (moving_avg_window) to smooth output.
-"""
+(Recreated)"""
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, Optional, Any, Deque, Tuple, Dict
@@ -34,7 +22,6 @@ class ModelPredictor:
     def __post_init__(self):
         self._recent_preds = deque(maxlen=self.moving_avg_window)
 
-    # ------------- Batch file prediction -------------
     def predict_file(self, path, audio_data=None, sr=None):
         if self.feature_extractor is None:
             raise ValueError("feature_extractor must be provided for file predictions")
@@ -49,10 +36,7 @@ class ModelPredictor:
         X = feats.get('train', {}).get('X')
         if X is None or len(X) == 0:
             return {"prediction": None, "confidence": 0.0}
-        if self.scaler is not None:
-            X_scaled = self.scaler.transform(X)
-        else:
-            X_scaled = X
+        X_scaled = self.scaler.transform(X) if self.scaler is not None else X
         if hasattr(self.model, 'predict_proba'):
             probs = self.model.predict_proba(X_scaled)
             mean_probs = probs.mean(axis=0)
@@ -61,14 +45,12 @@ class ModelPredictor:
             confidence = float(mean_probs[idx])
         else:
             preds = self.model.predict(X_scaled)
-            # majority vote
             values, counts = np.unique(preds, return_counts=True)
             idx = int(np.argmax(counts))
             pred = values[idx]
             confidence = float(counts[idx] / counts.sum())
         return {"prediction": pred, "confidence": confidence}
 
-    # ------------- Streaming update -------------
     def update_streaming(self, feature_vector: np.ndarray) -> Tuple[Optional[str], float]:
         fv = feature_vector
         if fv.ndim == 1:
@@ -82,9 +64,8 @@ class ModelPredictor:
             conf = float(probs[pred_idx])
         else:
             pred_label = self.model.predict(fv)[0]
-            conf = 1.0  # cannot derive probability; will adjust via smoothing
+            conf = 1.0
         self._recent_preds.append(pred_label)
-        # smoothing via majority vote across recent labels
         labels, counts = np.unique(list(self._recent_preds), return_counts=True)
         maj_idx = int(np.argmax(counts))
         smooth_label = labels[maj_idx]
@@ -94,22 +75,15 @@ class ModelPredictor:
     def reset_streaming(self):
         self._recent_preds.clear()
 
-# ------------- Helper utilities -------------
 
 def select_best_model(results: Dict[str, Any], metric: str = 'accuracy'):
-    """Select best model given training results.
-
-    Expects results like { 'models': {name: model}, 'metrics': {name: {'accuracy': val, ...}}, 'scalers': {name: scaler?}}
-    Returns (model_name, model, scaler, metrics_dict)
-    """
     metrics = results.get('metrics', {})
     best_name = None
     best_val = -np.inf
     for name, m in metrics.items():
-        if metric in m and m[metric] is not None:
-            if m[metric] > best_val:
-                best_val = m[metric]
-                best_name = name
+        if metric in m and m[metric] is not None and m[metric] > best_val:
+            best_val = m[metric]
+            best_name = name
     if best_name is None:
         raise ValueError(f"No models with metric {metric} found")
     model = results['models'][best_name]
@@ -129,8 +103,5 @@ def stream_predict_from_audio(model_predictor: ModelPredictor, segments: np.ndar
     return preds
 
 __all__ = [
-    'ModelPredictor',
-    'select_best_model',
-    'apply_model_to_file',
-    'stream_predict_from_audio',
+    'ModelPredictor', 'select_best_model', 'apply_model_to_file', 'stream_predict_from_audio'
 ]
