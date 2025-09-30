@@ -30,6 +30,9 @@ import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
+# Unified target sample rate for recordings to match pipeline expectations
+TARGET_SAMPLE_RATE = 40000
+
 
 def list_audio_devices() -> List[str]:
     """Return a list of available input devices (name with index)."""
@@ -46,7 +49,7 @@ def record_snippet(
     *,
     base_dir: Optional[Path | str] = "data/audio",
     duration: float = 1.0,
-    samplerate: int = 44100,
+    samplerate: int = TARGET_SAMPLE_RATE,  # kept for backward compat in signature but will be enforced to TARGET_SAMPLE_RATE
     channels: int = 1,
     device: Optional[int] = None,
     filename: Optional[str] = None,
@@ -78,8 +81,10 @@ def record_snippet(
 
     out_path = dest_dir / f"{filename}.wav"
 
+    # Enforce fixed sample rate regardless of user-supplied samplerate value
+    samplerate = TARGET_SAMPLE_RATE
     # record
-    print(f"Recording {duration}s @ {samplerate}Hz, channels={channels} to {out_path}")
+    print(f"Recording {duration}s @ {samplerate}Hz (fixed), channels={channels} to {out_path}")
     recording = sd.rec(int(duration * samplerate), samplerate=samplerate, channels=channels, dtype='float32', device=device)
     sd.wait()
 
@@ -97,8 +102,7 @@ if __name__ == "__main__":
 
 
 def create_recorder_ui(base_dir: Optional[Path | str] = "data/audio",
-                       default_duration: float = 2.0,
-                       default_samplerate: int = 44100) -> "object":
+                       default_duration: float = 2.0) -> "object":
     """Create and return an ipywidgets UI for recording audio snippets.
 
     The returned container can be displayed in a notebook. The record button
@@ -124,20 +128,21 @@ def create_recorder_ui(base_dir: Optional[Path | str] = "data/audio",
     device_dropdown = widgets.Dropdown(options=options, description="Device")
     defect_type_input = widgets.Text(value="bearing_fault", description="Defect")
     duration_input = widgets.FloatText(value=default_duration, description="Duration (s)")
-    samplerate_input = widgets.IntText(value=default_samplerate, description="Samplerate")
+    # Display fixed sample rate (non-editable label to avoid confusion)
+    samplerate_label = widgets.HTML(f"<b>Sample Rate:</b> {TARGET_SAMPLE_RATE} Hz (fixed)")
     channels_input = widgets.IntText(value=1, description="Channels")
     record_button = widgets.Button(description="Record", button_style="primary")
     output = widgets.Output()
 
     def _on_record_clicked(b):
         with output:
-            print(f"Recording {duration_input.value}s to defect '{defect_type_input.value}'...")
+            print(f"Recording {duration_input.value}s to defect '{defect_type_input.value}' (sample rate fixed at {TARGET_SAMPLE_RATE} Hz)...")
             try:
                 out_path = record_snippet(
                     defect_type_input.value,
                     base_dir=base_dir,
                     duration=float(duration_input.value),
-                    samplerate=int(samplerate_input.value),
+                    samplerate=TARGET_SAMPLE_RATE,
                     channels=int(channels_input.value),
                     device=device_dropdown.value,
                 )
@@ -151,7 +156,7 @@ def create_recorder_ui(base_dir: Optional[Path | str] = "data/audio",
         device_dropdown,
         defect_type_input,
         duration_input,
-        samplerate_input,
+        samplerate_label,
         channels_input,
         record_button,
         output,
