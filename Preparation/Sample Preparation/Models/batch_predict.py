@@ -23,9 +23,20 @@ from collections import Counter
 # Add feature extraction pipeline path (handle spaces in directories)
 _fe_path = Path('./Preparation/Sample Preparation/Feature_extraction_pipeline').resolve()
 if str(_fe_path) not in sys.path:
-    sys.path.append(str(_fe_path))
+    # Prepend to sys.path to ensure our local loader takes precedence over any similarly named external module
+    sys.path.insert(0, str(_fe_path))
 
-from loader import load_long_audio, TARGET_SAMPLE_RATE  # type: ignore
+# Robust import of TARGET_SAMPLE_RATE with fallback
+try:  # pragma: no cover - simple import guard
+    from loader import load_long_audio, TARGET_SAMPLE_RATE  # type: ignore
+except Exception:
+    try:
+        from loader import load_long_audio  # type: ignore
+        TARGET_SAMPLE_RATE = 40000  # fallback constant
+    except Exception as _imp_err:  # pragma: no cover
+        raise ImportError(
+            "Could not import loader or TARGET_SAMPLE_RATE. Ensure the feature_extraction pipeline path is correct."
+        ) from _imp_err
 from splitters import segment_train_test  # type: ignore
 from features_extractor import extract_features_for_list  # type: ignore
 
