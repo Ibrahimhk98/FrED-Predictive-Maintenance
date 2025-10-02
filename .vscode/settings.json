@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./Preparation/Sample Preparation/Feature_extraction_pipeline"
+    ]
+}

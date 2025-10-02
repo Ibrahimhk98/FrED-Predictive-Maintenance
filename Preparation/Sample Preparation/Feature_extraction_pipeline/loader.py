@@ -43,11 +43,6 @@ def load_long_audio(path: Path, target_sr: int = TARGET_SAMPLE_RATE) -> Tuple[np
 
     # resample if needed
     if sr != target_sr:
-        try:
-            data = librosa.resample(data, orig_sr=sr, target_sr=target_sr)
-            sr = target_sr
-        except Exception:
-            # fallback: if librosa fails, attempt scipy (if available) or return original
             try:
                 from scipy.signal import resample
                 num = int(len(data) * float(target_sr) / float(sr))

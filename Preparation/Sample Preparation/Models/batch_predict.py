@@ -37,8 +37,31 @@ except Exception:
         raise ImportError(
             "Could not import loader or TARGET_SAMPLE_RATE. Ensure the feature_extraction pipeline path is correct."
         ) from _imp_err
-from splitters import segment_train_test  # type: ignore
+from splitters import segment_region  # type: ignore
 from features_extractor import extract_features_for_list  # type: ignore
+
+# Optional rich feature extractor (mirrors orchestrator logic) -----------------
+_rich_fn = None  # cached handle
+
+def _get_rich_extractor():  # pragma: no cover - thin loader
+    global _rich_fn
+    if _rich_fn is not None:
+        return _rich_fn
+    try:
+        import importlib.util
+        rich_path = _fe_path / 'rich_features.py'
+        if rich_path.exists():
+            spec = importlib.util.spec_from_file_location('rich_features_dynamic', str(rich_path))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)  # type: ignore[attr-defined]
+            fn = getattr(mod, 'extract_features_for_list', None)
+            if callable(fn):
+                _rich_fn = fn
+                return _rich_fn
+    except Exception:  # noqa: BLE001
+        pass
+    _rich_fn = False  # sentinel meaning unavailable
+    return None
 
 try:
     from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
@@ -47,10 +70,25 @@ except Exception as e:  # pragma: no cover
 
 
 def discover_sample_files(sample_root: Path, allowed_exts: Iterable[str]) -> List[Path]:
-    sample_files: List[Path] = []
+    # Collect unique resolved paths to avoid duplicates caused by symlinks or
+    # overlapping glob patterns. Return a deterministic sorted list.
+    seen = set()
+    sample_files = []
     for p in sorted(sample_root.rglob('*')):
-        if p.is_file() and p.suffix.lower() in allowed_exts:
-            sample_files.append(p)
+        try:
+            if not p.is_file():
+                continue
+            if p.suffix.lower() not in allowed_exts:
+                continue
+            rp = p.resolve()
+        except Exception:
+            # Fallback to original path if resolve fails
+            rp = p
+        if str(rp) in seen:
+            continue
+        seen.add(str(rp))
+        # store resolved path to ensure uniform identity downstream
+        sample_files.append(rp)
     return sample_files
 
 
@@ -106,15 +144,26 @@ def predict_single_file(
     }
     try:
         audio_data, _sr = load_long_audio(path, target_sr=TARGET_SAMPLE_RATE)
-        segs = segment_train_test(audio_data, TARGET_SAMPLE_RATE, segment_seconds=segment_seconds, overlap=overlap)
-        seg_list: List[np.ndarray] = []
-        if isinstance(segs, dict):
-            seg_list = segs.get('train', []) + segs.get('test', [])
-        else:
-            seg_list = segs  # defensive
+        segment_samples = int(segment_seconds * TARGET_SAMPLE_RATE)
+        if segment_samples <= 0:
+            raise ValueError('segment_seconds must be > 0')
+        seg_list = segment_region(audio_data, 0, len(audio_data), segment_samples, overlap=overlap)
         if not seg_list:
             raise RuntimeError('No segments produced')
-        X_seg, seg_feat_names = extract_features_for_list(seg_list, TARGET_SAMPLE_RATE)
+
+        seg_feat_names = None
+        if feature_level in ("basic", "standard", "advanced"):
+            rich_ex = _get_rich_extractor()
+            if rich_ex:
+                try:
+                    X_seg, seg_feat_names = rich_ex(seg_list, TARGET_SAMPLE_RATE, level=feature_level)
+                except TypeError:
+                    X_seg, seg_feat_names = rich_ex(seg_list, TARGET_SAMPLE_RATE)
+            else:
+                X_seg, seg_feat_names = extract_features_for_list(seg_list, TARGET_SAMPLE_RATE)
+        else:
+            X_seg, seg_feat_names = extract_features_for_list(seg_list, TARGET_SAMPLE_RATE)
+
         if X_seg is None or getattr(X_seg, 'size', 0) == 0:
             raise RuntimeError('Feature extractor returned no features')
         record['n_segments'] = X_seg.shape[0]
@@ -122,27 +171,30 @@ def predict_single_file(
         record['n_feature_names'] = len(seg_feat_names) if seg_feat_names else 0
         X_aligned = _align_features(X_seg, seg_feat_names, scaler, train_feat_names)
         X_scaled = scaler.transform(X_aligned) if scaler is not None else X_aligned
+
+        # Always return segment-level predictions and confidences
         if hasattr(best_model, 'predict_proba'):
             probs = best_model.predict_proba(X_scaled)
+            seg_pred = best_model.classes_[np.argmax(probs, axis=1)]
+            seg_conf = probs.max(axis=1).tolist()
             avg_probs = probs.mean(axis=0)
             final_idx = int(np.argmax(avg_probs))
             final_label = best_model.classes_[final_idx]
             confidence = float(avg_probs[final_idx])
-            seg_pred = best_model.classes_[np.argmax(probs, axis=1)]
-            seg_conf = probs.max(axis=1).tolist()
         else:
             seg_pred = best_model.predict(X_scaled)
             cnt = Counter(seg_pred)
             final_label, count = cnt.most_common(1)[0]
             confidence = float(count / len(seg_pred))
             seg_conf = (seg_pred == final_label).astype(float).tolist()
+
         record.update({
             'prediction': final_label,
             'confidence': confidence,
             'segment_predictions': seg_pred.tolist() if hasattr(seg_pred, 'tolist') else list(seg_pred),
             'segment_confidences': seg_conf,
         })
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         record['error'] = str(exc)
     return record
 
@@ -170,19 +222,25 @@ def batch_predict_samples(
         raise FileNotFoundError(f'No files found under {sample_root} with extensions {allowed_exts}')
     records = [predict_single_file(f, best_model=best_model, scaler=scaler, segment_seconds=segment_seconds, overlap=overlap, feature_level=feature_level, train_feat_names=train_feat_names) for f in files]
     df = pd.DataFrame(records)
+
+    # Remove duplicate file-level aggregation logic: always use segment_predictions from predict_single_file
+    # This ensures UI and summary are consistent and not double-aggregated
     summary: Dict[str, Any] = {}
     if 'true_label' in df and df['true_label'].notna().any():
         valid = df['prediction'].notna() & df['error'].isna()
         if valid.any():
-            acc = accuracy_score(df.loc[valid, 'true_label'], df.loc[valid, 'prediction'])
+            # Aggregate predictions per file (majority vote already done in predict_single_file)
+            y_true = df.loc[valid, 'true_label']
+            y_pred = df.loc[valid, 'prediction']
+            acc = accuracy_score(y_true, y_pred)
             summary['accuracy'] = acc
             try:
                 labels = sorted(df['true_label'].unique())
-                cm = confusion_matrix(df.loc[valid, 'true_label'], df.loc[valid, 'prediction'], labels=labels)
+                cm = confusion_matrix(y_true, y_pred, labels=labels)
                 summary['confusion_matrix'] = cm
                 summary['labels'] = labels
-                summary['classification_report'] = classification_report(df.loc[valid, 'true_label'], df.loc[valid, 'prediction'])
-            except Exception as e:  # pragma: no cover
+                summary['classification_report'] = classification_report(y_true, y_pred)
+            except Exception as e:
                 summary['confusion_error'] = str(e)
         else:
             summary['accuracy'] = None
@@ -205,60 +263,63 @@ def render_batch_prediction_ui(
         import matplotlib.pyplot as plt
         import seaborn as sns
         from IPython.display import display
+        from IPython.display import clear_output
     except Exception as e:  # noqa: BLE001
         raise RuntimeError('ipywidgets, seaborn, and matplotlib are required for the UI') from e
 
-    status = w.Output()
     btn_run = w.Button(description='Run Batch Prediction', button_style='primary')
+    btn_clear = w.Button(description='Clear Output', button_style='warning')
     min_conf = w.FloatSlider(description='Min conf', value=0.0, min=0.0, max=1.0, step=0.01)
     show_errors = w.Checkbox(description='Show errors', value=False)
     df_store: Dict[str, Any] = {'df': None, 'summary': None}
 
+    output = w.Output()
+
     def _run(_):
-        status.clear_output()
-        with status:
-            print('Running batch prediction...')
-            try:
-                df, summary = batch_predict_samples(
-                    sample_root,
-                    best_model=best_model,
-                    scaler=scaler,
-                    segment_seconds=segment_seconds,
-                    overlap=overlap,
-                    feature_level=feature_level,
-                    train_feat_names=train_feat_names,
-                )
-                df_store['df'] = df
-                df_store['summary'] = summary
-                # filter by confidence
-                df_disp = df[df['confidence'] >= min_conf.value].copy()
-                if not show_errors.value:
-                    df_disp = df_disp[df_disp['error'].isna()]
-                display(df_disp[['file', 'true_label', 'prediction', 'confidence', 'n_segments', 'n_features_extracted']])
-                if summary.get('accuracy') is not None:
-                    print(f"Accuracy: {summary['accuracy']:.4f}")
-                if 'confusion_matrix' in summary:
-                    labels = summary['labels']
-                    cm = summary['confusion_matrix']
-                    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-                    sns.heatmap(cm, annot=True, fmt='d', cmap='Purples', xticklabels=labels, yticklabels=labels, ax=axs[0])
-                    axs[0].set_title('Counts')
-                    row_sums = cm.sum(axis=1, keepdims=True).astype(float)
-                    with np.errstate(divide='ignore', invalid='ignore'):
-                        cm_norm = np.divide(cm, row_sums, where=row_sums != 0)
-                        cm_norm = np.nan_to_num(cm_norm)
-                    sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Purples', xticklabels=labels, yticklabels=labels, ax=axs[1])
-                    axs[1].set_title('Row-normalized')
-                    plt.tight_layout()
-                    plt.show()
-            except Exception as exc:  # noqa: BLE001
-                print('Error:', exc)
+        
+        df, summary = batch_predict_samples(
+            sample_root,
+            best_model=best_model,
+            scaler=scaler,
+            segment_seconds=segment_seconds,
+            overlap=overlap,
+            feature_level=feature_level,
+            train_feat_names=train_feat_names,
+        )
+        print("df size is", df.shape)
+        df_store['df'] = df
+        df_store['summary'] = summary
+        # filter by confidence
+        df_disp = df[df['confidence'] >= min_conf.value].copy()
+        if not show_errors.value:
+            df_disp = df_disp[df_disp['error'].isna()]
+        
+        display(df_disp[['file', 'true_label', 'prediction', 'confidence', 'n_segments', 'n_features_extracted']])
+        if summary.get('accuracy') is not None:
+            print(f"Accuracy: {summary['accuracy']:.4f}")
+        if 'confusion_matrix' in summary:
+            labels = summary['labels']
+            cm = summary['confusion_matrix']
+            fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+            sns.heatmap(cm, annot=True, fmt='d', cmap='Purples', xticklabels=labels, yticklabels=labels, ax=axs[0])
+            axs[0].set_title('Counts')
+            row_sums = cm.sum(axis=1, keepdims=True).astype(float)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                cm_norm = np.divide(cm, row_sums, where=row_sums != 0)
+                cm_norm = np.nan_to_num(cm_norm)
+            sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Purples', xticklabels=labels, yticklabels=labels, ax=axs[1])
+            axs[1].set_title('Row-normalized')
+            plt.tight_layout()
+            plt.show()
+
+
 
     btn_run.on_click(_run)
+  
 
     ui = w.VBox([
         w.HBox([btn_run, min_conf, show_errors]),
-        status,
+        output
     ])
     return ui
 
