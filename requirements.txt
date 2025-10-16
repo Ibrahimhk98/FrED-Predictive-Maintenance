@@ -11,5 +11,5 @@ matplotlib>=3.7
 scipy>=1.10
 
 pytest>=7.0
-
+shap>=0.42
 seaborn>=0.12

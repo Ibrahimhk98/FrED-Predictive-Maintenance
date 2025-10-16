@@ -8,6 +8,15 @@ This module provides baseline MFCC feature extraction functionality:
 For richer feature sets, see rich_features.py which provides additional 
 time-domain and spectral descriptors at multiple complexity levels.
 """
+import warnings
+# Suppress all librosa warnings at import
+warnings.filterwarnings('ignore', category=UserWarning, module='librosa')
+warnings.filterwarnings('ignore', category=FutureWarning, module='librosa')
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='librosa')
+warnings.filterwarnings('ignore', message='.*PySoundFile failed.*')
+warnings.filterwarnings('ignore', message='.*librosa.*')
+warnings.filterwarnings('ignore', message='.*audioread.*')
+warnings.filterwarnings('ignore', message='.*soundfile.*')
 
 from typing import List, Tuple
 import numpy as np

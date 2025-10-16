@@ -316,9 +316,10 @@ def create_recorder_ui(base_dir: Optional[Path | str] = "data/audio",
         samplerate_label = widgets.HTML(f"<b>Sample Rate:</b> {TARGET_SAMPLE_RATE} Hz (fixed)")
         channels_input = widgets.IntText(value=1, description="Channels")
         # Encoder controls
-        encoder_checkbox = widgets.Checkbox(value=False, description='Enable encoder (GPIO)')
-        encoder_pin_input = widgets.IntText(value=None, description='Encoder GPIO (BCM)')
-        pulses_per_rev_input = widgets.IntText(value=1, description='Pulses / rev')
+        # Enable encoder controls by default and set recommended defaults
+        encoder_checkbox = widgets.Checkbox(value=True, description='Enable encoder (GPIO)')
+        encoder_pin_input = widgets.IntText(value=1, description='Encoder GPIO (BCM)')
+        pulses_per_rev_input = widgets.IntText(value=4704, description='Pulses / rev')
         record_button = widgets.Button(description="Record", button_style="primary")
         output = widgets.Output()
 

@@ -8,6 +8,16 @@ Provides three levels of features:
 
 The module is dependency-light (numpy, scipy, librosa) and avoids heavy extras.
 """
+import warnings
+# Suppress all librosa warnings at import
+warnings.filterwarnings('ignore', category=UserWarning, module='librosa')
+warnings.filterwarnings('ignore', category=FutureWarning, module='librosa')
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='librosa')
+warnings.filterwarnings('ignore', message='.*PySoundFile failed.*')
+warnings.filterwarnings('ignore', message='.*librosa.*')
+warnings.filterwarnings('ignore', message='.*audioread.*')
+warnings.filterwarnings('ignore', message='.*soundfile.*')
+
 from typing import List, Tuple, Dict
 import numpy as np
 from scipy import stats
