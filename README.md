@@ -7,8 +7,8 @@
 
 Get started immediately with our interactive notebooks:
 
-[![Open Audio Recorder in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/audio_recorder_colab.ipynb?v=2025-10-28)
-[![Open Workshop in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive%20Maintenance%20Workshop.ipynb?v=2025-10-28)
+[![Open Audio Recorder in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/audio_recorder_colab.ipynb)
+[![Open Workshop in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive%20Maintenance%20Workshop.ipynb)
 
 - **🎤 Audio Recorder Colab** - Record and collect machinery audio samples with Google Drive integration
 - **🛠️ Workshop Notebook** - Complete predictive maintenance workflow and analysis
