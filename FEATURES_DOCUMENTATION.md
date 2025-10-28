@@ -1,12 +1,48 @@
 # Rich Features Documentation
 
-This document explains the audio features extracted at each level in the `rich_features.py` pipeline. The pipeline offers three levels of feature extraction:
+This document explains the audio features extracted at each level in the `rich_features.py` pipeline. The pipeline offers four levels of feature extraction:
 
+- **Raw**: Direct audio signal values without feature extraction
 - **Basic**: Simple time-domain statistical features
 - **Standard**: Adds spectral, MFCC, and other common audio features  
 - **Advanced**: Includes time-series complexity features and higher-order statistics
 
-Each higher level includes all features from lower levels.
+Each higher level includes all features from lower levels (except Raw, which stands alone).
+
+## Raw Features (N features, where N = audio segment length)
+
+### Direct Signal Representation
+The **Raw** feature level provides the unprocessed audio signal values directly as features. This approach:
+
+- **No Feature Engineering**: Uses the raw amplitude values from the audio waveform
+- **Maximum Information Preservation**: Retains all temporal and amplitude information
+- **Variable Feature Count**: Number of features equals the length of the audio segment
+- **Deep Learning Ready**: Ideal for neural networks that can learn features automatically
+
+### Characteristics
+- **Features**: Each sample point in the audio segment becomes a feature
+- **Preprocessing**: Minimal - typically just normalization or scaling
+- **Advantages**: 
+  - No information loss from feature extraction
+  - Suitable for end-to-end learning approaches
+  - Captures all temporal dynamics and transient behaviors
+- **Disadvantages**:
+  - High dimensionality (thousands of features for short segments)
+  - Requires more sophisticated models (CNNs, RNNs, Transformers)
+  - Less interpretable than engineered features
+  - Sensitive to segment length variations
+
+### Use Cases
+- **Deep Learning Models**: CNNs, RNNs, and Transformer architectures
+- **End-to-End Learning**: When you want the model to learn optimal features
+- **Complex Pattern Recognition**: For subtle patterns that engineered features might miss
+- **Research Applications**: When exploring what patterns the data contains
+
+### Technical Details
+- **Data Type**: Raw floating-point amplitude values
+- **Normalization**: Often normalized to [-1, 1] or standardized (zero mean, unit variance)
+- **Segment Length**: Must be consistent across all samples for traditional ML
+- **Memory Requirements**: Significantly higher than engineered features
 
 ## Basic Features (11 features)
 
@@ -85,19 +121,28 @@ Time-series complexity measures from EEG analysis, adapted for audio:
 ## Feature Selection Guidelines
 
 ### For Bearing Fault Detection:
-- **Basic**: Good starting point for simple fault vs normal classification
-- **Standard**: Recommended - spectral features capture bearing defect frequencies, MFCCs provide robust representation
+- **Raw**: Best for deep learning approaches when you have large datasets and want the model to learn optimal features automatically
+- **Basic**: Good starting point for simple fault vs normal classification with traditional ML
+- **Standard**: Recommended for most applications - spectral features capture bearing defect frequencies, MFCCs provide robust representation
 - **Advanced**: Best for complex scenarios - entropy measures detect irregularities, Hjorth parameters capture fault dynamics
 
 ### Computational Considerations:
-- **Basic**: Fastest, minimal dependencies
+- **Raw**: Lowest extraction cost, but highest training/inference cost due to dimensionality
+- **Basic**: Fastest overall, minimal dependencies
 - **Standard**: Moderate computation, requires `librosa` 
-- **Advanced**: Highest computation, includes entropy calculations
+- **Advanced**: Highest feature extraction computation, includes entropy calculations
 
 ### Data Requirements:
-- **Basic**: Works with any segment length
+- **Raw**: Requires consistent segment lengths, works best with large datasets for deep learning
+- **Basic**: Works with any segment length, minimal data requirements
 - **Standard**: Requires segments long enough for meaningful spectral analysis (typically ≥0.1s)
 - **Advanced**: Entropy measures need sufficient data points for reliable estimates (typically ≥0.5s)
+
+### Model Recommendations:
+- **Raw**: Convolutional Neural Networks (CNNs), Recurrent Neural Networks (RNNs), Transformers
+- **Basic**: Logistic Regression, SVM, Decision Trees, Random Forest
+- **Standard**: All traditional ML algorithms, gradient boosting, ensemble methods
+- **Advanced**: Advanced ensemble methods, deep learning with engineered features
 
 ## Usage Example
 
@@ -109,14 +154,25 @@ segments = [audio_segment1, audio_segment2, ...]  # List of numpy arrays
 sample_rate = 40000
 
 # Choose feature level
+X_raw, names_raw = extract_features_for_list(segments, sample_rate, level='raw')
 X_basic, names_basic = extract_features_for_list(segments, sample_rate, level='basic')
 X_standard, names_standard = extract_features_for_list(segments, sample_rate, level='standard') 
 X_advanced, names_advanced = extract_features_for_list(segments, sample_rate, level='advanced')
 
+print(f"Raw features: {len(names_raw)} features (segment length)")
 print(f"Basic features: {len(names_basic)} features")
 print(f"Standard features: {len(names_standard)} features") 
 print(f"Advanced features: {len(names_advanced)} features")
 ```
+
+### Feature Level Selection Guide
+
+| Level | Feature Count | Best For | Computational Cost | Model Types |
+|-------|---------------|----------|-------------------|-------------|
+| **Raw** | ~1000-40000 | Deep learning, end-to-end learning | Low extraction, High training | CNNs, RNNs, Transformers |
+| **Basic** | ~15 | Quick prototyping, simple classification | Very Low | Linear models, SVMs, Trees |
+| **Standard** | ~50 | General audio analysis, balanced approach | Medium | Most ML algorithms |
+| **Advanced** | ~65 | Complex fault detection, research | High | Advanced ML, ensemble methods |
 
 ## Notes
 
