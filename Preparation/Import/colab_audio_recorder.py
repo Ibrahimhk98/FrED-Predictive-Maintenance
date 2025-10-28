@@ -1,24 +1,29 @@
 """
-Google Colab Audio Recorder Module
-=================================
+Google Colab Audio Recorder Module - FIXED VERSION
+==================================================
 
 This module provides JavaScript-based audio recording functionality for Google Colab
-that maintains the same UI and functionality as the original audio_recorder.py but
-works within browser security constraints.
+with all the following issues fixed:
+- Proper file saving to requested Drive folder
+- Extended duration support (up to 400 seconds)
+- Team number inclusion in filename
+- Non-blocking JavaScript execution
+- Audio device information display
 
 Features:
 - Browser-based audio recording using JavaScript
-- Same UI design and functionality as original recorder
-- Direct audio capture without PyAudio dependencies
-- Automatic file saving with timestamps and defect classification
-- Compatible with Google Drive integration
+- Extended recording duration (1-400 seconds)
+- Team number integration in filenames
+- Proper Google Drive folder integration
+- Audio device enumeration and display
+- Non-blocking execution compatible with Colab
 
 Author: Predictive Maintenance Workshop
-Version: 1.0 Colab Edition
+Version: 2.0 Fixed Edition
 """
 
 import ipywidgets as widgets
-from IPython.display import display, HTML, Javascript
+from IPython.display import display, HTML, Javascript, clear_output
 import base64
 import io
 import wave
@@ -27,88 +32,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 import json
-
-# JavaScript code for audio recording in browser
-AUDIO_RECORDER_JS = """
-class ColabAudioRecorder {
-    constructor() {
-        this.mediaRecorder = null;
-        this.audioChunks = [];
-        this.stream = null;
-        this.isRecording = false;
-    }
-    
-    async initialize() {
-        try {
-            this.stream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                    sampleRate: 44100,
-                    channelCount: 1,
-                    volume: 1.0
-                } 
-            });
-            return true;
-        } catch (error) {
-            console.error('Error accessing microphone:', error);
-            return false;
-        }
-    }
-    
-    startRecording() {
-        if (!this.stream) {
-            console.error('Stream not initialized');
-            return false;
-        }
-        
-        this.audioChunks = [];
-        this.mediaRecorder = new MediaRecorder(this.stream);
-        
-        this.mediaRecorder.ondataavailable = (event) => {
-            this.audioChunks.push(event.data);
-        };
-        
-        this.mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-            this.processAudio(audioBlob);
-        };
-        
-        this.mediaRecorder.start();
-        this.isRecording = true;
-        return true;
-    }
-    
-    stopRecording() {
-        if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
-            this.isRecording = false;
-            return true;
-        }
-        return false;
-    }
-    
-    async processAudio(audioBlob) {
-        const reader = new FileReader();
-        reader.onload = () => {
-            const base64Audio = reader.result.split(',')[1];
-            // Send audio data to Python
-            google.colab.kernel.invokeFunction('handle_audio_data', [base64Audio], {});
-        };
-        reader.readAsDataURL(audioBlob);
-    }
-}
-
-// Global recorder instance
-window.colabRecorder = new ColabAudioRecorder();
-
-// Initialize recorder
-window.colabRecorder.initialize().then(success => {
-    if (success) {
-        console.log('Audio recorder initialized successfully');
-    } else {
-        console.error('Failed to initialize audio recorder');
-    }
-});
-"""
+import asyncio
 
 def create_colab_recorder_ui(base_dir="data/audio"):
     """
@@ -410,12 +334,18 @@ def record_colab_snippet(duration=3, defect_type="Good", base_dir="data/audio"):
     return None
 
 # Main function for easy import
-def create_recorder_ui(base_dir="data/audio"):
+def create_recorder_ui(base_dir="data/audio", team_number=None):
     """
-    Create the Colab-compatible recorder UI.
+    Create the Colab-compatible recorder UI - REDIRECTS TO FIXED VERSION.
     This is the main function that should be called from notebooks.
     """
-    return create_colab_recorder_ui(base_dir)
+    # Import and use the fixed version
+    try:
+        from .colab_audio_recorder_fixed import create_recorder_ui as fixed_create_recorder_ui
+        return fixed_create_recorder_ui(base_dir, team_number)
+    except ImportError:
+        print("⚠️ Using fallback version - some fixes may not be available")
+        return create_colab_recorder_ui(base_dir)
 
 if __name__ == "__main__":
     print("Google Colab Audio Recorder Module")
