@@ -3,6 +3,18 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
+## 🚀 Quick Start with Google Colab
+
+Get started immediately with our interactive notebooks:
+
+[![Open Audio Recorder in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/audio_recorder_colab.ipynb)
+[![Open Workshop in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/Predictive%20Maintenance%20Workshop.ipynb)
+
+- **🎤 Audio Recorder Colab** - Record and collect machinery audio samples with Google Drive integration
+- **🛠️ Workshop Notebook** - Complete predictive maintenance workflow and analysis
+
+---
+
 A comprehensive predictive maintenance system that uses audio analysis and machine learning to detect equipment faults and anomalies in industrial machinery.
 
 ## 🎯 Overview
@@ -29,54 +41,13 @@ FrED (Fault Recognition and Equipment Diagnostics) is an advanced predictive mai
 - **Automatic Data Backup** - Configurable auto-save intervals
 - **Comprehensive Metrics** - Performance tracking and analytics
 
-## 📁 Project Structure
-
-```
-FrED-Predictive-Maintenance/
-├── 📊 Notebooks/
-│   ├── audio_recorder_local.ipynb      # Local audio recording interface
-│   ├── audio_recorder_colab.ipynb      # Google Colab version with Drive integration
-│   ├── audio_and_encoder.ipynb         # Audio processing and encoding
-│   ├── regression_example.ipynb        # Regression analysis examples
-│   └── Predictive Maintenance Workshop.ipynb
-│
-├── 🔧 Preparation/
-│   ├── Import/
-│   │   ├── audio_recorder.py           # Audio recording utilities
-│   │   └── audio_and_encoder.py        # Audio processing functions
-│   │
-│   └── Sample Preparation/
-│       ├── Feature_extraction_pipeline/
-│       │   ├── features_extractor.py   # Feature extraction algorithms
-│       │   ├── orchestrator.py         # Pipeline orchestration
-│       │   ├── rich_features.py        # Advanced feature engineering
-│       │   └── splitters.py           # Data splitting utilities
-│       │
-│       ├── Models/
-│       │   ├── enhanced_live_inspector_ui.py  # Advanced monitoring UI
-│       │   ├── live_inspector.py       # Real-time monitoring core
-│       │   ├── model_predictor.py      # ML model inference
-│       │   └── batch_predict.py        # Batch prediction utilities
-│       │
-│       └── Performance_metrics/
-│           └── metrics.py              # Model evaluation metrics
-│
-├── 📁 Data/
-│   └── audio/
-│       ├── Good/                       # Healthy machinery samples
-│       └── Chipped Tooth/              # Fault condition samples
-│
-├── 📋 requirements.txt                 # Python dependencies
-├── 📄 FEATURES_DOCUMENTATION.md       # Detailed feature documentation
-└── 📖 README.md                       # This file
-```
 
 ## 🛠️ Installation
 
 ### Prerequisites
 - Python 3.8 or higher
-- Audio input device (microphone)
-- Jupyter Notebook environment
+- Audio input device (contact microphone provided by instructors)
+- Google Colab environment
 
 ### Local Setup
 
@@ -97,13 +68,20 @@ pip install -r requirements.txt
 
 ### Google Colab Setup
 
-1. **Open the Colab notebook:**
-   - Use `audio_recorder_colab.ipynb` for cloud-based recording
-   - Automatically handles repository cloning and dependency installation
+**🎤 Audio Recording in Colab:**
+- [![Open Audio Recorder](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/audio_recorder_colab.ipynb)
+- Cloud-based recording with Google Drive integration
+- Automatically handles repository cloning and dependency installation
 
-2. **Mount Google Drive:**
-   - The notebook will prompt you to authorize Drive access
-   - Data is saved to shared drives for collaboration
+**🛠️ Complete Workshop in Colab:**
+- [![Open Workshop](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/Predictive%20Maintenance%20Workshop.ipynb)
+- Full predictive maintenance workflow and analysis
+- Interactive tutorials and examples
+
+**Setup Steps:**
+1. **Click the Colab badges above** to open notebooks directly in Google Colab
+2. **Mount Google Drive:** The notebooks will prompt you to authorize Drive access
+3. **Data Storage:** Audio samples and results are saved to shared drives for collaboration
 
 ## 🎯 Quick Start
 
@@ -133,7 +111,27 @@ orchestrator = FeatureOrchestrator()
 features = orchestrator.extract_features(audio_data)
 ```
 
-## 📚 Usage Examples
+## � Interactive Notebooks
+
+### 🎤 Audio Data Collection
+**[Audio Recorder Colab](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/audio_recorder_colab.ipynb)** [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/audio_recorder_colab.ipynb)
+- **Purpose**: Record and collect machinery audio samples
+- **Features**: Google Drive integration, device selection, organized data storage
+- **Best For**: Data collection phase, building your audio dataset
+
+### 🛠️ Complete Workshop
+**[Predictive Maintenance Workshop](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/Predictive%20Maintenance%20Workshop.ipynb)** [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance-/blob/main/Predictive%20Maintenance%20Workshop.ipynb)
+- **Purpose**: End-to-end predictive maintenance workflow
+- **Features**: Feature extraction, model training, real-time monitoring
+- **Best For**: Learning the complete pipeline, hands-on tutorial
+
+### 💻 Local Development
+For local development, use:
+- `audio_recorder_local.ipynb` - Local audio recording without Drive dependencies
+- `audio_and_encoder.ipynb` - Audio processing and encoding examples
+- `regression_example.ipynb` - Regression analysis and model examples
+
+## �📚 Usage Examples
 
 ### Basic Audio Recording
 The audio recorder provides an intuitive interface for collecting machinery audio samples:
