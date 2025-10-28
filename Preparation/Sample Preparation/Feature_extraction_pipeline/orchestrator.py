@@ -92,7 +92,7 @@ def run_pipeline_on_file(path: Path, segment_seconds: float = 1.0, overlap: floa
     train_segs = segments.get("train", [])
     test_segs = segments.get("test", [])
 
-    if feature_level in ("basic", "standard", "advanced"):
+    if feature_level in ("raw", "basic", "standard", "advanced"):
         rich_fn = _get_rich_extractor()
         if rich_fn is not None:
             Xtr, feat_names = rich_fn(train_segs, sr, level=feature_level)
@@ -165,7 +165,7 @@ def run_pipeline_on_dataset(src_dir: Path, segment_seconds: float = 1.0, overlap
 
                 feature_names may be None when using the lightweight extractor.
                 """
-                if level_local in ("basic", "standard", "advanced"):
+                if level_local in ("raw", "basic", "standard", "advanced"):
                     rich_fn_local = _get_rich_extractor()
                     if rich_fn_local is not None:
                         X_out, names = rich_fn_local(segs, sr_local, level=level_local)

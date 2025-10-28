@@ -64,7 +64,7 @@ class LiveAudioInspector:
             scaler: Fitted StandardScaler for feature normalization
             segment_seconds: Length of each analysis segment
             overlap: Overlap fraction between segments (0.0 - 1.0)
-            feature_level: Feature extraction level ('basic', 'standard', 'advanced')
+            feature_level: Feature extraction level ('raw', 'basic', 'standard', 'advanced')
             feature_names: List of expected feature names from training
             buffer_duration: Duration of audio buffer to maintain (seconds)
             device: Audio input device index (None for default)
@@ -181,7 +181,7 @@ class LiveAudioInspector:
                 warnings.filterwarnings('ignore', message='.*PySoundFile failed.*')
                 
                 # Use appropriate feature extractor based on level
-                if self.feature_level in ['standard', 'advanced'] and extract_features_for_list is not None:
+                if self.feature_level in ['raw', 'basic', 'standard', 'advanced'] and extract_features_for_list is not None:
                     features, names = extract_features_for_list([audio_segment], self.sample_rate, level=self.feature_level)
                     if features.shape[0] > 0:
                         feature_vector = features[0]

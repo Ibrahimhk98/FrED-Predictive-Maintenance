@@ -46,6 +46,7 @@ def list_audio_devices() -> List[str]:
 
 def record_snippet(
     defect_type: str,
+    team: str,
     *,
     base_dir: Optional[Path | str] = "data/audio",
     duration: float = 1.0,
@@ -77,7 +78,7 @@ def record_snippet(
     if filename is None:
         import datetime
 
-        filename = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{team}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     out_path = dest_dir / f"{filename}.wav"
 
@@ -126,7 +127,12 @@ def create_recorder_ui(base_dir: Optional[Path | str] = "data/audio",
         options.append((d, idx))
 
     device_dropdown = widgets.Dropdown(options=options, description="Device")
-    defect_type_input = widgets.Text(value="bearing_fault", description="Defect")
+    defect_type_input = widgets.Dropdown(
+        options=["Good", "Vertical Wear", "Off Centered axle", "Chipped Tooth"],
+        value="Good",
+        description="Defect",
+    )
+    team_input = widgets.Text(value="", description="Team #", placeholder="Enter team number")
     duration_input = widgets.FloatText(value=default_duration, description="Duration (s)")
     # Display fixed sample rate (non-editable label to avoid confusion)
     samplerate_label = widgets.HTML(f"<b>Sample Rate:</b> {TARGET_SAMPLE_RATE} Hz (fixed)")
@@ -140,6 +146,7 @@ def create_recorder_ui(base_dir: Optional[Path | str] = "data/audio",
             try:
                 out_path = record_snippet(
                     defect_type_input.value,
+                    team_input.value,
                     base_dir=base_dir,
                     duration=float(duration_input.value),
                     samplerate=TARGET_SAMPLE_RATE,
@@ -154,6 +161,7 @@ def create_recorder_ui(base_dir: Optional[Path | str] = "data/audio",
 
     ui = widgets.VBox([
         device_dropdown,
+        team_input,
         defect_type_input,
         duration_input,
         samplerate_label,

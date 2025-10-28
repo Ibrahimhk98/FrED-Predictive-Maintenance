@@ -1,6 +1,7 @@
 """Rich, multi-level feature extraction for audio/time-series segments.
 
-Provides three levels of features:
+Provides four levels of features:
+- raw: returns binned raw audio samples (max 10,000 features) for manageable deep learning
 - basic: simple time-domain statistics
 - standard: adds spectral, MFCC, chroma and other common audio features
 - advanced: includes time-series features (sample entropy, permutation entropy),
@@ -300,16 +301,67 @@ def extract_advanced_features(x: np.ndarray, sr: int) -> Tuple[np.ndarray, List[
     return np.array(vals, dtype=float), names
 
 
+def extract_raw_features(x: np.ndarray, sr: int, max_features: int = 1000) -> Tuple[np.ndarray, List[str]]:
+    """Raw audio data with optional binning to reduce dimensionality.
+    
+    Returns binned raw audio samples, useful for deep learning models
+    that can learn features directly from raw audio while keeping
+    dimensionality manageable.
+    
+    Args:
+        x: Raw audio samples
+        sr: Sample rate (unused but kept for API consistency)
+        max_features: Maximum number of features to return (default: 1000)
+    
+    Note: All segments must have the same length when using 'raw' level,
+    as they will be stacked into a matrix. Use fixed-length segmentation
+    to ensure consistent dimensions.
+    """
+    x = np.asarray(x, dtype=float)
+    
+    # Always produce exactly max_features, regardless of input length
+    if len(x) == 0:
+        # Empty signal - return zeros
+        binned_features = np.zeros(max_features)
+        feature_names = [f'raw_bin_{i}_mean' for i in range(max_features)]
+        return binned_features, feature_names
+    
+    if len(x) <= max_features:
+        # For short signals, use numpy interpolation to reach max_features
+        old_indices = np.linspace(0, len(x)-1, len(x))
+        new_indices = np.linspace(0, len(x)-1, max_features)
+        binned_features = np.interp(new_indices, old_indices, x)
+    else:
+        # For long signals, bin down to max_features
+        bin_size = len(x) // max_features
+        n_bins = max_features  # Always produce exactly max_features
+        
+        # Trim the signal to be evenly divisible by bin_size
+        trimmed_length = n_bins * bin_size
+        x_trimmed = x[:trimmed_length]
+        
+        # Reshape into bins and take the mean of each bin
+        x_reshaped = x_trimmed.reshape(n_bins, bin_size)
+        binned_features = np.mean(x_reshaped, axis=1)
+    
+    # Generate feature names
+    feature_names = [f'raw_bin_{i}_mean' for i in range(max_features)]
+    
+    return binned_features, feature_names
+
+
 def extract_features_for_list(segments: List[np.ndarray], sr: int, level: str = 'standard') -> Tuple[np.ndarray, List[str]]:
     """Extract features for a list of segments and return feature matrix and feature names.
 
-    level: 'basic' | 'standard' | 'advanced'
+    level: 'raw' | 'basic' | 'standard' | 'advanced'
     """
     all_feats = []
     feature_names = None
     for seg in segments:
         try:
-            if level == 'basic':
+            if level == 'raw':
+                v, names = extract_raw_features(seg, sr, max_features=1000)
+            elif level == 'basic':
                 v, names = extract_basic_features(seg, sr)
             elif level == 'advanced':
                 v, names = extract_advanced_features(seg, sr)

@@ -152,7 +152,7 @@ def predict_single_file(
             raise RuntimeError('No segments produced')
 
         seg_feat_names = None
-        if feature_level in ("basic", "standard", "advanced"):
+        if feature_level in ("raw", "basic", "standard", "advanced"):
             rich_ex = _get_rich_extractor()
             if rich_ex:
                 try:

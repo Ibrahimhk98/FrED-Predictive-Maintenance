@@ -153,7 +153,7 @@ def run_regression_on_file(
         seg_mid_times.append(seg_mid)
 
     # Feature extraction using rich extractor when available
-    if feature_level in ("basic", "standard", "advanced") and _rich_extract is not None:
+    if feature_level in ("raw", "basic", "standard", "advanced") and _rich_extract is not None:
         try:
             X_seg, feat_names = _rich_extract(seg_audio_list, sr, level=feature_level)
         except TypeError:
