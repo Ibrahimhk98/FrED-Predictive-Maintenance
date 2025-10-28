@@ -147,22 +147,28 @@ def create_colab_recorder_ui(base_dir="data/audio"):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             defect_type = recorder_state['defect_type']
             
-            # Create defect type directory
+            # Create defect type directory in shared folder
             defect_dir = os.path.join(recorder_state['base_dir'], defect_type)
             os.makedirs(defect_dir, exist_ok=True)
             
-            # Save audio file
+            # Save audio file with more descriptive naming
             filename = f"{defect_type}_{timestamp}.wav"
             filepath = os.path.join(defect_dir, filename)
             
             with open(filepath, 'wb') as f:
                 f.write(audio_bytes)
             
+            # Get relative path for display
+            base_name = os.path.basename(recorder_state['base_dir'])
+            relative_path = os.path.join(base_name, defect_type, filename)
+            
             status_output.clear_output()
             with status_output:
                 print(f"✅ Saved: {filename}")
-                print(f"📁 Location: {filepath}")
+                print(f"📁 Shared Location: {relative_path}")
                 print(f"🎵 Defect Type: {defect_type}")
+                print(f"👥 File accessible to all students in shared folder")
+                print(f"📊 File size: {len(audio_bytes)} bytes")
             
         except Exception as e:
             status_output.clear_output()
