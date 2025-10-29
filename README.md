@@ -51,9 +51,9 @@ FrED (Fault Recognition and Equipment Diagnostics) is an advanced predictive mai
 4. **Open the audio recorder notebook:** `audio_recorder_local.ipynb`
 
 **� Workshop Notebooks:**
-- **`audio_recorder_local.ipynb`** - Record and collect machinery audio samples locally
+- **`audio_recorder_shared.ipynb`** - Record and collect machinery audio samples locally
 - **`Predictive Maintenance Workshop.ipynb`** - Complete workflow and analysis
-- **`regression_example.ipynb`** - Machine learning examples and tutorials
+
 
 
 ## � Interactive Notebooks
