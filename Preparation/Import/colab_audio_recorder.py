@@ -336,16 +336,23 @@ def record_colab_snippet(duration=3, defect_type="Good", base_dir="data/audio"):
 # Main function for easy import
 def create_recorder_ui(base_dir="data/audio", team_number=None):
     """
-    Create the Colab-compatible recorder UI - REDIRECTS TO FIXED VERSION.
+    Create the Colab-compatible recorder UI - REDIRECTS TO WORKING VERSION.
     This is the main function that should be called from notebooks.
     """
-    # Import and use the fixed version
+    # Import and use the working version with debugging
     try:
-        from .colab_audio_recorder_fixed import create_recorder_ui as fixed_create_recorder_ui
-        return fixed_create_recorder_ui(base_dir, team_number)
+        from .colab_audio_recorder_working import create_recorder_ui as working_create_recorder_ui
+        print("🔧 Loading enhanced working version with debugging...")
+        return working_create_recorder_ui(base_dir, team_number)
     except ImportError:
-        print("⚠️ Using fallback version - some fixes may not be available")
-        return create_colab_recorder_ui(base_dir)
+        # Fallback to fixed version
+        try:
+            from .colab_audio_recorder_fixed import create_recorder_ui as fixed_create_recorder_ui
+            print("⚠️ Loading fixed version as fallback...")
+            return fixed_create_recorder_ui(base_dir, team_number)
+        except ImportError:
+            print("⚠️ Using basic fallback version - limited functionality")
+            return create_colab_recorder_ui(base_dir)
 
 if __name__ == "__main__":
     print("Google Colab Audio Recorder Module")
