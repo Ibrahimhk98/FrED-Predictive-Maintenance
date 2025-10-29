@@ -157,3 +157,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 👥 Authors
 
 - **Ibrahim Elkhatib** - *Project Lead* - [@Ibrahimhk98](https://github.com/Ibrahimhk98)
+- **Manuel Ivan Vea** - *Co-author* - [@ManuelVea](https://github.com/ManuelVea) 
