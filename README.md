@@ -3,15 +3,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
-## 🚀 Quick Start with Google Colab
+## � Prerequisites
 
-Get started immediately with our interactive notebooks:
+Before the workshop session, ensure you have:
 
-[![Open Audio Recorder in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/audio_recorder_colab.ipynb)
-[![Open Workshop in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive%20Maintenance%20Workshop.ipynb)
-
-- **🎤 Audio Recorder Colab** - Record and collect machinery audio samples with Google Drive integration
-- **🛠️ Workshop Notebook** - Complete predictive maintenance workflow and analysis
+- **🐍 Anaconda Distribution** - Download from [anaconda.com](https://www.anaconda.com/products/distribution)
+- **📓 Jupyter Notebook** - Included with Anaconda installation
+- **🎤 Audio Input Device** - Contact microphone provided by instructors
+- **�️ Compatible Operating System** - Windows, macOS, or Linux
 
 ---
 
@@ -44,10 +43,11 @@ FrED (Fault Recognition and Equipment Diagnostics) is an advanced predictive mai
 
 ## 🛠️ Installation
 
-### Prerequisites
-- Python 3.8 or higher
-- Audio input device (contact microphone provided by instructors)
-- Google Colab environment
+### System Requirements
+- **Python 3.8+** (included with Anaconda)
+- **Anaconda Distribution** with Jupyter Notebook
+- **Audio input device** (contact microphone provided by instructors)
+- **Microphone permissions** enabled for Python/Jupyter
 
 ### Local Setup
 
@@ -62,26 +62,29 @@ cd FrED-Predictive-Maintenance
 pip install -r requirements.txt
 ```
 
-3. **Grant microphone permissions** (macOS users):
-   - System Preferences → Security & Privacy → Privacy → Microphone
-   - Enable access for your terminal/IDE
+3. **Grant microphone permissions:**
+   - **macOS**: System Preferences → Security & Privacy → Privacy → Microphone → Enable for Python/Jupyter
+   - **Windows**: Windows Settings → Privacy → Microphone → Allow apps to access microphone
+   - **Linux**: Ensure audio recording permissions are enabled for your user account
 
-### Google Colab Setup
+### Jupyter Notebook Setup
 
-**🎤 Audio Recording in Colab:**
-- [![Open Audio Recorder](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/audio_recorder_colab.ipynb?v=2025-10-28)
-- Cloud-based recording with Google Drive integration
-- Automatically handles repository cloning and dependency installation
+**🚀 Getting Started:**
+1. **Launch Anaconda Navigator** or use command line
+2. **Start Jupyter Notebook** from Anaconda Navigator or run `jupyter notebook`
+3. **Navigate to the repository folder** in Jupyter's file browser
+4. **Open the audio recorder notebook:** `audio_recorder_local.ipynb`
 
-**🛠️ Complete Workshop in Colab:**
-- [![Open Workshop](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive%20Maintenance%20Workshop.ipynb?v=2025-10-28)
-- Full predictive maintenance workflow and analysis
-- Interactive tutorials and examples
+**� Workshop Notebooks:**
+- **`audio_recorder_local.ipynb`** - Record and collect machinery audio samples locally
+- **`Predictive Maintenance Workshop.ipynb`** - Complete workflow and analysis
+- **`regression_example.ipynb`** - Machine learning examples and tutorials
 
 **Setup Steps:**
-1. **Click the Colab badges above** to open notebooks directly in Google Colab
-2. **Mount Google Drive:** The notebooks will prompt you to authorize Drive access
-3. **Data Storage:** Audio samples and results are saved to shared drives for collaboration
+1. **Install Anaconda** if not already installed
+2. **Clone this repository** to your local machine
+3. **Install dependencies** using pip or conda
+4. **Launch Jupyter Notebook** and open the workshop files
 
 ## 🎯 Quick Start
 
