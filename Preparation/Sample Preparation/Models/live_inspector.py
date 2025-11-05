@@ -2,6 +2,24 @@
 
 This module provides functions to simulate real-time audio streaming and continuous
 model inference for predictive maintenance scenarios.
+
+Enhanced Features:
+- Configurable low-pass filtering to remove high-frequency noise
+- Runtime filter configuration changes
+- Multiple cutoff frequency options for different machinery types
+- Backward compatibility with existing implementations
+
+The low-pass filter (500 Hz default) helps improve signal quality by removing:
+- High-frequency electrical noise and interference
+- Sampling artifacts and aliasing
+- Unwanted harmonics above the machinery's operating frequency range
+- Environmental high-frequency noise
+
+Filter can be configured for different use cases:
+- General machinery: 500 Hz (default)
+- High-speed equipment: 1000-2000 Hz
+- Low-speed heavy equipment: 200-300 Hz
+- Research/troubleshooting: Disable filtering
 """
 import warnings
 # Comprehensive librosa warning suppression
@@ -22,6 +40,7 @@ from pathlib import Path
 import sounddevice as sd
 from collections import deque
 import pandas as pd
+from scipy.signal import butter, filtfilt
 
 # Import feature extraction components
 try:
@@ -43,6 +62,50 @@ except ImportError as e:
 # Target sample rate for consistency with training
 TARGET_SAMPLE_RATE = 40000
 
+# Low-pass filter configuration (matching loader.py)
+DEFAULT_LOWPASS_CUTOFF = 500.0  # Hz - filters out high-frequency noise above 500Hz
+DEFAULT_FILTER_ORDER = 4        # 4th order Butterworth filter provides good roll-off
+
+
+def apply_lowpass_filter(data: np.ndarray, sr: int, cutoff_freq: float = DEFAULT_LOWPASS_CUTOFF, 
+                         order: int = DEFAULT_FILTER_ORDER) -> np.ndarray:
+    """Apply a low-pass Butterworth filter to audio data.
+    
+    Removes high-frequency components (noise, vibrations) while preserving
+    the mechanical signature frequencies typically below 500 Hz for predictive maintenance.
+    
+    Args:
+        data: 1-D audio signal
+        sr: sample rate in Hz  
+        cutoff_freq: cutoff frequency in Hz (default: 500 Hz)
+        order: filter order (default: 4)
+        
+    Returns:
+        Filtered audio signal (same shape as input)
+    """
+    if len(data) == 0:
+        return data
+        
+    # Ensure we have enough samples for the filter
+    min_samples = max(3 * order, 6)  # Conservative minimum
+    if len(data) < min_samples:
+        return data  # Return unfiltered if too short
+        
+    # Validate cutoff frequency (must be below Nyquist frequency)
+    nyquist = sr / 2.0
+    if cutoff_freq >= nyquist:
+        cutoff_freq = nyquist * 0.95  # Use 95% of Nyquist as safety margin
+        
+    # Design the Butterworth low-pass filter
+    # Note: cutoff_freq is normalized by Nyquist frequency
+    b, a = butter(order, cutoff_freq / nyquist, btype='low', analog=False)
+    
+    # Apply zero-phase filtering (forward and backward pass)
+    # This eliminates phase distortion but doubles the effective filter order
+    filtered_data = filtfilt(b, a, data)
+    
+    return filtered_data.astype(np.float32)
+
 
 class LiveAudioInspector:
     """Real-time audio inspector for continuous predictive maintenance monitoring."""
@@ -55,7 +118,9 @@ class LiveAudioInspector:
                  feature_level: str = 'standard',
                  feature_names: Optional[List[str]] = None,
                  buffer_duration: float = 10.0,
-                 device: Optional[int] = None):
+                 device: Optional[int] = None,
+                 apply_lowpass: bool = True,
+                 lowpass_cutoff: Optional[float] = None):
         """
         Initialize the live audio inspector.
         
@@ -68,6 +133,9 @@ class LiveAudioInspector:
             feature_names: List of expected feature names from training
             buffer_duration: Duration of audio buffer to maintain (seconds)
             device: Audio input device index (None for default)
+            apply_lowpass: whether to apply low-pass filter (default: True)
+            lowpass_cutoff: cutoff frequency for low-pass filter in Hz 
+                          (default: None, uses DEFAULT_LOWPASS_CUTOFF)
         """
         self.model = model
         self.scaler = scaler
@@ -76,6 +144,10 @@ class LiveAudioInspector:
         self.feature_level = feature_level
         self.feature_names = feature_names
         self.device = device
+        
+        # Filter parameters
+        self.apply_lowpass = apply_lowpass
+        self.lowpass_cutoff = lowpass_cutoff if lowpass_cutoff is not None else DEFAULT_LOWPASS_CUTOFF
         
         # Audio buffer parameters
         self.sample_rate = TARGET_SAMPLE_RATE
@@ -170,10 +242,14 @@ class LiveAudioInspector:
             time.sleep(0.01)  # Small sleep to prevent busy waiting
             
     def _extract_features(self, audio_segment: np.ndarray) -> Optional[np.ndarray]:
-        """Extract features from audio segment."""
+        """Extract features from audio segment with optional low-pass filtering."""
         import warnings
         
         try:
+            # Apply low-pass filter if enabled
+            if self.apply_lowpass and len(audio_segment) > 0:
+                audio_segment = apply_lowpass_filter(audio_segment, self.sample_rate, self.lowpass_cutoff)
+            
             # Suppress librosa warnings during feature extraction
             with warnings.catch_warnings():
                 warnings.filterwarnings('ignore', category=UserWarning, module='librosa')
@@ -239,6 +315,10 @@ class LiveAudioInspector:
         print(f"Device: {self.device}, Sample rate: {self.sample_rate} Hz")
         print(f"Segment: {self.segment_seconds}s, Overlap: {self.overlap}")
         print(f"Feature level: {self.feature_level}")
+        if self.apply_lowpass:
+            print(f"Low-pass filter: ENABLED (cutoff: {self.lowpass_cutoff} Hz)")
+        else:
+            print(f"Low-pass filter: DISABLED")
         
         self.is_running = True
         
@@ -287,6 +367,39 @@ class LiveAudioInspector:
             self.analysis_thread.join(timeout=2.0)
             
         print("Live audio inspection stopped")
+        
+    def configure_filter(self, apply_lowpass: Optional[bool] = None, 
+                        lowpass_cutoff: Optional[float] = None) -> None:
+        """Configure low-pass filter settings.
+        
+        Args:
+            apply_lowpass: whether to apply low-pass filter (None to keep current)
+            lowpass_cutoff: cutoff frequency in Hz (None to keep current)
+        """
+        if apply_lowpass is not None:
+            self.apply_lowpass = apply_lowpass
+            
+        if lowpass_cutoff is not None:
+            self.lowpass_cutoff = float(lowpass_cutoff)
+            
+        # Print current configuration
+        if self.apply_lowpass:
+            print(f"Filter updated: LOW-PASS ENABLED (cutoff: {self.lowpass_cutoff} Hz)")
+        else:
+            print(f"Filter updated: LOW-PASS DISABLED")
+        
+    def get_filter_config(self) -> Dict[str, Any]:
+        """Get current filter configuration.
+        
+        Returns:
+            Dictionary with filter settings
+        """
+        return {
+            'apply_lowpass': self.apply_lowpass,
+            'lowpass_cutoff': self.lowpass_cutoff,
+            'default_cutoff': DEFAULT_LOWPASS_CUTOFF,
+            'filter_order': DEFAULT_FILTER_ORDER
+        }
         
     def get_results_dataframe(self) -> pd.DataFrame:
         """Get results as a pandas DataFrame."""

@@ -9,6 +9,45 @@ This document explains the audio features extracted at each level in the `rich_f
 
 Each higher level includes all features from lower levels (except Raw, which stands alone).
 
+## Signal Preprocessing and Filtering
+
+### High-Pass Filtering (New Feature)
+All audio signals are automatically preprocessed with a high-pass filter before feature extraction:
+
+- **Default Cutoff**: 50 Hz Butterworth filter (4th order)
+- **Purpose**: Removes low-frequency noise, vibrations, and DC offset
+- **Benefits**: Enhances signal-to-noise ratio for mechanical signature analysis
+- **Configurable**: Can be adjusted or disabled per use case
+
+#### Filter Configuration Options:
+```python
+# Default behavior (50 Hz high-pass enabled)
+data, sr = load_long_audio('audio.wav')
+
+# Custom cutoff frequency
+data, sr = load_long_audio('audio.wav', highpass_cutoff=100.0)
+
+# Disable filtering entirely
+data, sr = load_long_audio('audio.wav', apply_highpass=False)
+
+# Set global defaults
+configure_default_filter(cutoff_freq=75.0, order=6)
+```
+
+#### What the Filter Removes:
+- **DC Offset**: Constant amplitude shifts in the signal
+- **Low-Frequency Drift**: Slow variations unrelated to mechanical signatures
+- **Environmental Vibrations**: Building vibrations, footsteps, etc. (typically < 50 Hz)
+- **Power Line Harmonics**: 50/60 Hz electrical interference and harmonics
+- **Handling Noise**: Low-frequency mechanical noise that obscures the signal of interest
+
+#### Technical Details:
+- **Filter Type**: Butterworth (maximally flat passband)
+- **Zero-Phase**: Uses `filtfilt` for forward-backward filtering (no phase distortion)
+- **Adaptive Cutoff**: Automatically adjusts if cutoff exceeds Nyquist frequency
+- **Short Segment Protection**: Bypasses filtering for very short audio segments
+- **Processing Order**: Applied before resampling to prevent aliasing artifacts
+
 ## Raw Features (N features, where N = audio segment length)
 
 ### Direct Signal Representation
