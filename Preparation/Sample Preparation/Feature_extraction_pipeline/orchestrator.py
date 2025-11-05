@@ -71,7 +71,7 @@ from typing import Dict, Any
 import numpy as np
 
 
-def run_pipeline_on_file(path: Path, segment_seconds: float = 1.0, overlap: float = 0.5, train_fraction: float = 0.8, buffer_seconds: float = 0.5, feature_level: str = 'standard') -> Dict[str, Any]:
+def run_pipeline_on_file(path: Path, segment_seconds: float = 1.0, overlap: float = 0.5, train_fraction: float = 0.8, buffer_seconds: float = 0.5, feature_level: str = 'standard', lowpass_cutoff: float = 2000) -> Dict[str, Any]:
     path = Path(path)
     X_train_parts = []
     y_train_parts = []
@@ -81,7 +81,7 @@ def run_pipeline_on_file(path: Path, segment_seconds: float = 1.0, overlap: floa
     meta_test = []
 
     try:
-        data, sr = load_long_audio(path)
+        data, sr = load_long_audio(path, lowpass_cutoff=lowpass_cutoff)
     except Exception:
         return {
             "train": {"X": np.empty((0, 0)), "y": [], "meta": [], "feature_names": None},
@@ -133,7 +133,7 @@ def run_pipeline_on_file(path: Path, segment_seconds: float = 1.0, overlap: floa
     return result
 
 
-def run_pipeline_on_dataset(src_dir: Path, segment_seconds: float = 1.0, overlap: float = 0.5, train_fraction: float = 0.8, buffer_seconds: float = 0.5, dst: Path | None = None, feature_level: str = 'standard') -> Dict[str, Any]:
+def run_pipeline_on_dataset(src_dir: Path, segment_seconds: float = 1.0, overlap: float = 0.5, train_fraction: float = 0.8, buffer_seconds: float = 0.5, lowpass_cutoff: float = 2000, dst: Path | None = None, feature_level: str = 'standard') -> Dict[str, Any]:
     src_dir = Path(src_dir)
     X_train_parts = []
     y_train_parts = []
@@ -152,7 +152,7 @@ def run_pipeline_on_dataset(src_dir: Path, segment_seconds: float = 1.0, overlap
             if not f.is_file() or f.suffix.lower() not in SUPPORTED:
                 continue
             try:
-                data, sr = load_long_audio(f)
+                data, sr = load_long_audio(f, lowpass_cutoff=lowpass_cutoff)
             except Exception:
                 continue
             segments = segment_train_test(data, sr, segment_seconds, overlap=overlap, train_fraction=train_fraction, buffer_seconds=buffer_seconds)

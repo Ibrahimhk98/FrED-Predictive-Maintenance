@@ -123,6 +123,7 @@ def predict_single_file(
     overlap: float,
     feature_level: str,
     train_feat_names: Optional[List[str]] = None,
+    lowpass_cutoff: float = 2000,
 ) -> Dict[str, Any]:
     """Predict a single audio file returning metadata + prediction details.
 
@@ -143,7 +144,7 @@ def predict_single_file(
         'error': None,
     }
     try:
-        audio_data, _sr = load_long_audio(path, target_sr=TARGET_SAMPLE_RATE)
+        audio_data, _sr = load_long_audio(path, target_sr=TARGET_SAMPLE_RATE, lowpass_cutoff=lowpass_cutoff)
         segment_samples = int(segment_seconds * TARGET_SAMPLE_RATE)
         if segment_samples <= 0:
             raise ValueError('segment_seconds must be > 0')
