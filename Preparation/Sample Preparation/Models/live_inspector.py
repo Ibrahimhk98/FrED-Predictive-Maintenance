@@ -195,7 +195,7 @@ class LiveAudioInspector:
         self.lowpass_cutoff = lowpass_cutoff if lowpass_cutoff is not None else DEFAULT_LOWPASS_CUTOFF
         
         # Audio buffer parameters
-        self.sample_rate = TARGET_SAMPLE_RATE
+        self.sample_rate = TARGET_SAMPLE_RATE  # Default sample rate
         self.buffer_size = int(buffer_duration * self.sample_rate)
         self.segment_samples = int(segment_seconds * self.sample_rate)
         self.hop_samples = int(self.segment_samples * (1 - overlap))
@@ -252,6 +252,119 @@ class LiveAudioInspector:
         # Handle other types
         print(f"⚠️ LiveAudioInspector: Invalid device type {type(device)}. Using default device.")
         return None
+        
+    def _find_working_audio_device(self, preferred_device=None):
+        """
+        Enhanced device detection for Anaconda Jupyter compatibility.
+        
+        Systematically tests devices to find one that works with the current environment,
+        particularly addressing Anaconda Jupyter channel configuration issues.
+        
+        Args:
+            preferred_device: Optional device to prefer if it works
+            
+        Returns:
+            tuple: (device_id, sample_rate) for a working device, or (None, None) if none found
+        """
+        print("🔍 Enhanced device detection for Anaconda Jupyter...")
+        
+        try:
+            devices = sd.query_devices()
+        except Exception as e:
+            print(f"❌ Failed to query audio devices: {e}")
+            return None, None
+            
+        working_options = []
+        
+        # Test devices systematically
+        for i, device_info in enumerate(devices):
+            if device_info['max_input_channels'] == 0:
+                continue  # Skip output-only devices
+                
+            print(f"  🧪 Testing Device {i}: {device_info['name']}")
+            print(f"      Input channels: {device_info['max_input_channels']}")
+            print(f"      Default sample rate: {device_info['default_samplerate']} Hz")
+            
+            # Test with device's native sample rate first
+            for test_rate in [device_info['default_samplerate'], 44100, 48000, 22050, 16000]:
+                try:
+                    test_stream = sd.InputStream(
+                        device=i,
+                        channels=1,
+                        samplerate=int(test_rate),
+                        blocksize=1024
+                    )
+                    # Brief test to ensure it actually works
+                    test_stream.start()
+                    time.sleep(0.1)  # Let it run briefly
+                    test_stream.stop()
+                    test_stream.close()
+                    
+                    working_options.append((i, device_info, int(test_rate)))
+                    print(f"      ✅ WORKS at {int(test_rate)} Hz")
+                    break
+                    
+                except Exception as e:
+                    error_msg = str(e).lower()
+                    if "invalid number of channels" in error_msg or "paerrorcode -9998" in error_msg:
+                        print(f"      ❌ Channel error: {e}")
+                        # Try with 2 channels if available and this is a channel issue
+                        if device_info['max_input_channels'] >= 2:
+                            try:
+                                test_stream_2ch = sd.InputStream(
+                                    device=i,
+                                    channels=2,
+                                    samplerate=int(test_rate),
+                                    blocksize=1024
+                                )
+                                test_stream_2ch.start()
+                                time.sleep(0.1)
+                                test_stream_2ch.stop()
+                                test_stream_2ch.close()
+                                # If 2-channel works, we'll need to handle mono conversion
+                                working_options.append((i, device_info, int(test_rate), 2))
+                                print(f"      ✅ WORKS with 2 channels at {int(test_rate)} Hz")
+                                break
+                            except:
+                                continue
+                    else:
+                        print(f"      ❌ Failed at {int(test_rate)} Hz: {e}")
+                        continue
+        
+        if not working_options:
+            print("❌ No working input devices found!")
+            return None, None
+            
+        # Select the best option
+        selected_option = working_options[0]  # Default to first working
+        
+        # Prefer the requested device if it works
+        if preferred_device is not None:
+            for option in working_options:
+                if option[0] == preferred_device:
+                    selected_option = option
+                    break
+                    
+        # Prefer built-in microphone if available
+        for option in working_options:
+            device_name = option[1]['name'].lower()
+            if any(keyword in device_name for keyword in ['microphone', 'built-in', 'internal']):
+                selected_option = option
+                break
+        
+        device_id = selected_option[0]
+        device_info = selected_option[1]
+        sample_rate = selected_option[2]
+        channels = selected_option[3] if len(selected_option) > 3 else 1
+        
+        print(f"🎯 Selected Device {device_id}: {device_info['name']}")
+        print(f"    Sample rate: {sample_rate} Hz")
+        print(f"    Channels: {channels}")
+        
+        # Store channel info for later use
+        self._device_channels = channels
+        
+        return device_id, sample_rate
         
     def set_callback(self, callback: Callable[[Dict[str, Any]], None]):
         """Set callback function to receive prediction results."""
@@ -393,7 +506,7 @@ class LiveAudioInspector:
         return np.array(features)
         
     def start(self):
-        """Start live audio inspection."""
+        """Start live audio inspection with enhanced Anaconda Jupyter compatibility."""
         if self.is_running:
             print("Inspector is already running")
             return
@@ -413,7 +526,14 @@ class LiveAudioInspector:
         self.analysis_thread = threading.Thread(target=self._analysis_worker)
         self.analysis_thread.start()
         
-        # Start audio stream with enhanced error handling
+        # Enhanced device validation for Anaconda Jupyter
+        working_device = self.device
+        working_sample_rate = self.sample_rate
+        channels_to_use = 1
+        
+        # First attempt with current configuration
+        stream_created = False
+        
         try:
             self.stream = sd.InputStream(
                 callback=self._audio_callback,
@@ -424,46 +544,93 @@ class LiveAudioInspector:
             )
             self.stream.start()
             print("Audio stream started successfully")
+            stream_created = True
             
         except Exception as e:
-            print(f"Failed to start audio stream: {e}")
+            error_msg = str(e).lower()
+            
+            # Handle Anaconda Jupyter specific channel errors
+            if "invalid number of channels" in error_msg or "paerrorcode -9998" in error_msg:
+                print("� ANACONDA JUPYTER CHANNEL ERROR DETECTED!")
+                print("   Attempting automatic device resolution...")
+                
+                # Find a working device and configuration
+                working_device, working_sample_rate = self._find_working_audio_device(self.device)
+                
+                if working_device is not None:
+                    # Update our configuration
+                    self.device = working_device
+                    self.sample_rate = working_sample_rate
+                    
+                    # Check if we need to use multi-channel input
+                    channels_to_use = getattr(self, '_device_channels', 1)
+                    
+                    print(f"🔧 Retrying with Device {working_device} @ {working_sample_rate} Hz, {channels_to_use} channels...")
+                    
+                    try:
+                        self.stream = sd.InputStream(
+                            callback=self._audio_callback,
+                            channels=channels_to_use,
+                            samplerate=working_sample_rate,
+                            blocksize=1024,
+                            device=working_device
+                        )
+                        self.stream.start()
+                        print("✅ Audio stream started successfully with automatic configuration!")
+                        stream_created = True
+                        
+                        # Update channel handling in callback if needed
+                        if channels_to_use > 1:
+                            print(f"   Note: Using {channels_to_use} channels, will convert to mono in callback")
+                            
+                    except Exception as retry_error:
+                        print(f"❌ Retry failed: {retry_error}")
+                        stream_created = False
+                else:
+                    print("❌ No working audio device found!")
+                    stream_created = False
+                    
+            else:
+                # Handle other error types with existing logic
+                print(f"Failed to start audio stream: {e}")
+                
+                if "single values and pairs are allowed" in error_msg:
+                    print("🔧 DEVICE ERROR DETECTED!")
+                    print("   This error is caused by passing a device dictionary instead of device index.")
+                    print("   Solution: Use cleanup_device_variables() to clean your namespace, or")
+                    print("   Solution: Pass an integer device ID instead of a device dictionary.")
+                    print("   Example: LiveAudioInspector(..., device=1) instead of device=device_dict")
+                elif "device" in error_msg:
+                    print("🔧 DEVICE ACCESS ERROR!")
+                    print("   The audio device might be in use by another application or unavailable.")
+                    print("   Try: 1) Close other audio apps, 2) Use a different device, 3) Restart audio system")
+                
+                stream_created = False
+        
+        # If stream creation failed, clean up and raise error
+        if not stream_created:
             self.is_running = False
             
-            # Provide specific guidance for common errors
-            error_msg = str(e).lower()
-            if "single values and pairs are allowed" in error_msg:
-                print("🔧 DEVICE ERROR DETECTED!")
-                print("   This error is caused by passing a device dictionary instead of device index.")
-                print("   Solution: Use cleanup_device_variables() to clean your namespace, or")
-                print("   Solution: Pass an integer device ID instead of a device dictionary.")
-                print("   Example: LiveAudioInspector(..., device=1) instead of device=device_dict")
-            elif "invalid number of channels" in error_msg:
-                print("🔧 CHANNEL ERROR DETECTED!")
-                print("   This error means the selected device doesn't support the requested channels.")
-                if self.device is not None:
-                    try:
-                        device_info = sd.query_devices(self.device)
-                        print(f"   Device {self.device} ({device_info['name']}) has {device_info['max_input_channels']} input channels")
-                        if device_info['max_input_channels'] == 0:
-                            print("   ❌ This is an output-only device! Select a device with input channels > 0")
-                    except:
-                        print("   Could not query device info")
-            elif "device" in error_msg:
-                print("🔧 DEVICE ACCESS ERROR!")
-                print("   The audio device might be in use by another application or unavailable.")
-                print("   Try: 1) Close other audio apps, 2) Use a different device, 3) Restart audio system")
-            
+            print("\n💡 TROUBLESHOOTING GUIDE:")
             print("   Available devices:")
             try:
                 devices = sd.query_devices()
                 for i, dev in enumerate(devices):
                     if dev['max_input_channels'] > 0:
-                        print(f"     Device {i}: {dev['name']} ({dev['max_input_channels']} input channels)")
+                        status = "✅" if i == working_device else "📱"
+                        print(f"     {status} Device {i}: {dev['name']} ({dev['max_input_channels']} input channels)")
             except:
                 print("     Could not list devices")
+                
+            print("\n   Solutions for Anaconda Jupyter:")
+            print("   1. Restart your Jupyter kernel")
+            print("   2. Check macOS audio permissions")
+            print("   3. Try: live_inspector = create_live_inspector_safe(...)")
+            print("   4. Close other applications using audio")
+            
             if self.analysis_thread:
                 self.analysis_thread.join()
-            raise
+            raise Exception("Failed to create audio stream after all retry attempts")
             
     def stop(self):
         """Stop live audio inspection."""
@@ -1236,12 +1403,14 @@ def simulate_streaming_from_file(file_path: Path,
 
 
 def create_live_inspector_safe(model, scaler, feature_level='standard', feature_names=None, 
-                               device=None, cleanup_namespace=True, **kwargs):
+                               device=None, cleanup_namespace=True, auto_detect_device=True, **kwargs):
     """
     Safely create a LiveAudioInspector with automatic device validation and namespace cleanup.
+    Enhanced for Anaconda Jupyter compatibility with automatic device detection.
     
-    This is a convenience function that automatically handles device validation
-    and optionally cleans up problematic variables from the namespace.
+    This is a convenience function that automatically handles device validation,
+    optionally cleans up problematic variables, and can automatically detect
+    working audio devices for Anaconda Jupyter environments.
     
     Args:
         model: Trained sklearn model
@@ -1250,13 +1419,14 @@ def create_live_inspector_safe(model, scaler, feature_level='standard', feature_
         feature_names: List of expected feature names from training
         device: Audio device (int, dict, or None). Automatically validated.
         cleanup_namespace: Whether to automatically clean up device variables (default: True)
+        auto_detect_device: Whether to automatically find working device on failures (default: True)
         **kwargs: Additional arguments passed to LiveAudioInspector
     
     Returns:
         LiveAudioInspector: Configured inspector ready for use
     
     Example:
-        # Safe creation with automatic cleanup
+        # Safe creation with automatic cleanup and device detection
         inspector = create_live_inspector_safe(
             model=my_model, 
             scaler=my_scaler,
@@ -1272,6 +1442,30 @@ def create_live_inspector_safe(model, scaler, feature_level='standard', feature_
         removed = cleanup_device_variables(frame.f_globals)
         if removed:
             print(f"🧹 Cleaned up problematic variables: {removed}")
+    
+    # Enhanced device auto-detection for Anaconda Jupyter
+    if auto_detect_device and device is None:
+        print("🔍 Auto-detecting optimal audio device...")
+        try:
+            # Create temporary inspector just for device detection
+            temp_inspector = LiveAudioInspector(
+                model=model,
+                scaler=scaler,
+                feature_level=feature_level,
+                feature_names=feature_names,
+                device=None,  # Start with None to trigger detection
+                **kwargs
+            )
+            
+            # Find working device
+            working_device, working_sample_rate = temp_inspector._find_working_audio_device()
+            if working_device is not None:
+                device = working_device
+                # Note: sample_rate is handled internally by LiveAudioInspector
+                print(f"🎯 Auto-selected Device {device} @ {working_sample_rate} Hz")
+            
+        except Exception as detect_error:
+            print(f"⚠️ Auto-detection failed, using default: {detect_error}")
     
     # Create inspector with validated parameters
     try:
@@ -1289,12 +1483,42 @@ def create_live_inspector_safe(model, scaler, feature_level='standard', feature_
     except Exception as e:
         print(f"❌ Failed to create LiveAudioInspector: {e}")
         
-        # Provide guidance based on error type
+        # Enhanced error guidance for Anaconda Jupyter
         error_msg = str(e).lower()
-        if "device" in error_msg:
-            print("💡 Device-related error. Try:")
-            print("   1. Use an integer device ID: device=1")
-            print("   2. Check available devices with: sounddevice.query_devices()")
-            print("   3. Use None for default device: device=None")
+        if "device" in error_msg or "channel" in error_msg:
+            print("🔧 ANACONDA JUPYTER AUDIO ERROR DETECTED!")
+            print("💡 Automatic solutions:")
+            
+            if auto_detect_device:
+                print("   🤖 Attempting automatic device resolution...")
+                try:
+                    # Try to create a temporary inspector for device detection
+                    temp_inspector = LiveAudioInspector(
+                        model=model, scaler=scaler, feature_level=feature_level,
+                        feature_names=feature_names, device=None, **kwargs
+                    )
+                    
+                    working_device, working_sample_rate = temp_inspector._find_working_audio_device()
+                    if working_device is not None:
+                        print(f"   ✅ Found working device: {working_device} @ {working_sample_rate} Hz")
+                        # Note: sample_rate is handled internally by LiveAudioInspector
+                        
+                        # Retry with working device
+                        inspector = LiveAudioInspector(
+                            model=model, scaler=scaler, feature_level=feature_level,
+                            feature_names=feature_names, device=working_device, **kwargs
+                        )
+                        print("🎉 LiveAudioInspector created successfully with auto-detected device!")
+                        return inspector
+                        
+                except Exception as auto_error:
+                    print(f"   ❌ Auto-resolution failed: {auto_error}")
+            
+            print("\n   Manual solutions:")
+            print("   1. Restart Jupyter kernel")
+            print("   2. Check macOS audio permissions")  
+            print("   3. Try: device=None for default device")
+            print("   4. Close other audio applications")
+            print("   5. Check available devices with: sounddevice.query_devices()")
         
         raise
