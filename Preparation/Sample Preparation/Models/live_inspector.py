@@ -143,7 +143,20 @@ class LiveAudioInspector:
         self.overlap = overlap
         self.feature_level = feature_level
         self.feature_names = feature_names
-        self.device = device
+        
+        # Validate and normalize device parameter
+        if device is not None:
+            if isinstance(device, dict):
+                # If it's a device dictionary, extract the index
+                self.device = device.get('index', None)
+                print(f"🔧 LiveAudioInspector: Extracted device index {self.device} from device dictionary")
+            elif isinstance(device, (int, float)):
+                self.device = int(device)
+            else:
+                print(f"⚠️ LiveAudioInspector: Invalid device type {type(device)}. Using default device.")
+                self.device = None
+        else:
+            self.device = device
         
         # Filter parameters
         self.apply_lowpass = apply_lowpass
