@@ -67,6 +67,49 @@ DEFAULT_LOWPASS_CUTOFF = 500.0  # Hz - filters out high-frequency noise above 50
 DEFAULT_FILTER_ORDER = 4        # 4th order Butterworth filter provides good roll-off
 
 
+def cleanup_device_variables(globals_dict=None):
+    """
+    Utility function to clean up problematic device variables from namespace.
+    
+    This function removes device dictionary variables that can cause 
+    "Only single values and pairs are allowed" errors in sounddevice.
+    
+    Args:
+        globals_dict: Dictionary to clean (defaults to caller's globals())
+    
+    Returns:
+        list: Names of variables that were removed
+    
+    Example:
+        from live_inspector import cleanup_device_variables
+        removed = cleanup_device_variables(globals())
+        print(f"Cleaned up: {removed}")
+    """
+    if globals_dict is None:
+        import inspect
+        frame = inspect.currentframe().f_back
+        globals_dict = frame.f_globals
+    
+    removed_vars = []
+    vars_to_remove = []
+    
+    # Find problematic device dictionary variables
+    for var_name, var_value in globals_dict.items():
+        if isinstance(var_value, dict):
+            # Check if it looks like a sounddevice device dictionary
+            if ('name' in var_value and 'index' in var_value and 
+                ('max_input_channels' in var_value or 'max_output_channels' in var_value)):
+                vars_to_remove.append(var_name)
+    
+    # Remove problematic variables
+    for var_name in vars_to_remove:
+        if var_name in globals_dict:
+            del globals_dict[var_name]
+            removed_vars.append(var_name)
+    
+    return removed_vars
+
+
 def apply_lowpass_filter(data: np.ndarray, sr: int, cutoff_freq: float = DEFAULT_LOWPASS_CUTOFF, 
                          order: int = DEFAULT_FILTER_ORDER) -> np.ndarray:
     """Apply a low-pass Butterworth filter to audio data.
@@ -144,19 +187,8 @@ class LiveAudioInspector:
         self.feature_level = feature_level
         self.feature_names = feature_names
         
-        # Validate and normalize device parameter
-        if device is not None:
-            if isinstance(device, dict):
-                # If it's a device dictionary, extract the index
-                self.device = device.get('index', None)
-                print(f"🔧 LiveAudioInspector: Extracted device index {self.device} from device dictionary")
-            elif isinstance(device, (int, float)):
-                self.device = int(device)
-            else:
-                print(f"⚠️ LiveAudioInspector: Invalid device type {type(device)}. Using default device.")
-                self.device = None
-        else:
-            self.device = device
+        # Comprehensive device parameter validation and normalization
+        self.device = self._validate_and_normalize_device(device)
         
         # Filter parameters
         self.apply_lowpass = apply_lowpass
@@ -178,6 +210,48 @@ class LiveAudioInspector:
         # Results tracking
         self.results_history = []
         self.callback_function = None
+    
+    def _validate_and_normalize_device(self, device):
+        """
+        Comprehensive device parameter validation and normalization.
+        
+        Handles multiple input types:
+        - None: Use system default device
+        - int/float: Use as device index
+        - dict: Extract 'index' field from device dictionary
+        - str: Try to parse as integer
+        
+        Returns:
+            int or None: Validated device index
+        """
+        if device is None:
+            return None
+            
+        # Handle dictionary (from sounddevice.query_devices())
+        if isinstance(device, dict):
+            if 'index' in device:
+                device_index = device['index']
+                print(f"🔧 LiveAudioInspector: Extracted device index {device_index} from device dictionary '{device.get('name', 'Unknown')}'")
+                return int(device_index) if device_index is not None else None
+            else:
+                print(f"⚠️ LiveAudioInspector: Device dictionary missing 'index' field. Using default device.")
+                return None
+        
+        # Handle numeric types
+        if isinstance(device, (int, float)):
+            return int(device)
+        
+        # Handle string (try to parse as integer)
+        if isinstance(device, str):
+            try:
+                return int(device)
+            except ValueError:
+                print(f"⚠️ LiveAudioInspector: Could not parse device string '{device}' as integer. Using default device.")
+                return None
+        
+        # Handle other types
+        print(f"⚠️ LiveAudioInspector: Invalid device type {type(device)}. Using default device.")
+        return None
         
     def set_callback(self, callback: Callable[[Dict[str, Any]], None]):
         """Set callback function to receive prediction results."""
@@ -339,7 +413,7 @@ class LiveAudioInspector:
         self.analysis_thread = threading.Thread(target=self._analysis_worker)
         self.analysis_thread.start()
         
-        # Start audio stream
+        # Start audio stream with enhanced error handling
         try:
             self.stream = sd.InputStream(
                 callback=self._audio_callback,
@@ -354,6 +428,39 @@ class LiveAudioInspector:
         except Exception as e:
             print(f"Failed to start audio stream: {e}")
             self.is_running = False
+            
+            # Provide specific guidance for common errors
+            error_msg = str(e).lower()
+            if "single values and pairs are allowed" in error_msg:
+                print("🔧 DEVICE ERROR DETECTED!")
+                print("   This error is caused by passing a device dictionary instead of device index.")
+                print("   Solution: Use cleanup_device_variables() to clean your namespace, or")
+                print("   Solution: Pass an integer device ID instead of a device dictionary.")
+                print("   Example: LiveAudioInspector(..., device=1) instead of device=device_dict")
+            elif "invalid number of channels" in error_msg:
+                print("🔧 CHANNEL ERROR DETECTED!")
+                print("   This error means the selected device doesn't support the requested channels.")
+                if self.device is not None:
+                    try:
+                        device_info = sd.query_devices(self.device)
+                        print(f"   Device {self.device} ({device_info['name']}) has {device_info['max_input_channels']} input channels")
+                        if device_info['max_input_channels'] == 0:
+                            print("   ❌ This is an output-only device! Select a device with input channels > 0")
+                    except:
+                        print("   Could not query device info")
+            elif "device" in error_msg:
+                print("🔧 DEVICE ACCESS ERROR!")
+                print("   The audio device might be in use by another application or unavailable.")
+                print("   Try: 1) Close other audio apps, 2) Use a different device, 3) Restart audio system")
+            
+            print("   Available devices:")
+            try:
+                devices = sd.query_devices()
+                for i, dev in enumerate(devices):
+                    if dev['max_input_channels'] > 0:
+                        print(f"     Device {i}: {dev['name']} ({dev['max_input_channels']} input channels)")
+            except:
+                print("     Could not list devices")
             if self.analysis_thread:
                 self.analysis_thread.join()
             raise
@@ -1126,3 +1233,68 @@ def simulate_streaming_from_file(file_path: Path,
             
         print(f"Simulation complete. Generated {len(results)} predictions.")
         return pd.DataFrame(results) if results else pd.DataFrame()
+
+
+def create_live_inspector_safe(model, scaler, feature_level='standard', feature_names=None, 
+                               device=None, cleanup_namespace=True, **kwargs):
+    """
+    Safely create a LiveAudioInspector with automatic device validation and namespace cleanup.
+    
+    This is a convenience function that automatically handles device validation
+    and optionally cleans up problematic variables from the namespace.
+    
+    Args:
+        model: Trained sklearn model
+        scaler: Fitted StandardScaler 
+        feature_level: Feature extraction level ('raw', 'basic', 'standard', 'advanced')
+        feature_names: List of expected feature names from training
+        device: Audio device (int, dict, or None). Automatically validated.
+        cleanup_namespace: Whether to automatically clean up device variables (default: True)
+        **kwargs: Additional arguments passed to LiveAudioInspector
+    
+    Returns:
+        LiveAudioInspector: Configured inspector ready for use
+    
+    Example:
+        # Safe creation with automatic cleanup
+        inspector = create_live_inspector_safe(
+            model=my_model, 
+            scaler=my_scaler,
+            device=1,  # or device={'index': 1, 'name': '...'}
+            feature_level='standard'
+        )
+        inspector.start()
+    """
+    # Clean up namespace if requested
+    if cleanup_namespace:
+        import inspect
+        frame = inspect.currentframe().f_back
+        removed = cleanup_device_variables(frame.f_globals)
+        if removed:
+            print(f"🧹 Cleaned up problematic variables: {removed}")
+    
+    # Create inspector with validated parameters
+    try:
+        inspector = LiveAudioInspector(
+            model=model,
+            scaler=scaler,
+            feature_level=feature_level,
+            feature_names=feature_names,
+            device=device,
+            **kwargs
+        )
+        print("✅ LiveAudioInspector created successfully with validated parameters!")
+        return inspector
+        
+    except Exception as e:
+        print(f"❌ Failed to create LiveAudioInspector: {e}")
+        
+        # Provide guidance based on error type
+        error_msg = str(e).lower()
+        if "device" in error_msg:
+            print("💡 Device-related error. Try:")
+            print("   1. Use an integer device ID: device=1")
+            print("   2. Check available devices with: sounddevice.query_devices()")
+            print("   3. Use None for default device: device=None")
+        
+        raise
