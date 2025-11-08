@@ -50,19 +50,26 @@ FrED (Fault Recognition and Equipment Diagnostics) is an advanced predictive mai
 3. **Navigate to the repository folder** in Jupyter's file browser
 4. **Open the audio recorder notebook:** `audio_recorder_local.ipynb`
 
-**� Workshop Notebooks:**
+**📝 Workshop Notebooks:**
 - **`audio_recorder_shared.ipynb`** - Record and collect machinery audio samples locally
 - **`Predictive Maintenance Workshop.ipynb`** - Complete workflow and analysis
+- **`Predictive_Maintenance_Workshop_colab.ipynb`** - Google Colab optimized version
 
 
 
-## � Interactive Notebooks
+## 📊 Interactive Notebooks
 
 ### 🛠️ Complete Workshop
 **[Predictive Maintenance Workshop](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive%20Maintenance%20Workshop.ipynb?v=2025-10-28)** [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive%20Maintenance%20Workshop.ipynb)
 - **Purpose**: End-to-end predictive maintenance workflow
 - **Features**: Feature extraction, model training, real-time monitoring
 - **Best For**: Learning the complete pipeline, hands-on tutorial
+
+### ☁️ Google Colab Version
+**[Predictive Maintenance Workshop - Colab](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive_Maintenance_Workshop_colab.ipynb)** [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/Ibrahimhk98/FrED-Predictive-Maintenance/blob/main/Predictive_Maintenance_Workshop_colab.ipynb)
+- **Purpose**: Cloud-optimized version for Google Colab environment
+- **Features**: Pre-configured dependencies, cloud-compatible audio handling
+- **Best For**: Quick start without local installation, collaborative work
 
 
 
