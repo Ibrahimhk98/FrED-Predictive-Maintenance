@@ -30,7 +30,7 @@ TARGET_SAMPLE_RATE = 40000
 
 # Low-pass filter configuration
 DEFAULT_LOWPASS_CUTOFF = 500.0  # Hz - filters out high-frequency noise above 500Hz
-DEFAULT_FILTER_ORDER = 4        # 4th order Butterworth filter provides good roll-off
+DEFAULT_FILTER_ORDER = 7        # 4th order Butterworth filter provides good roll-off
 
 
 def apply_lowpass_filter(data: np.ndarray, sr: int, cutoff_freq: float = DEFAULT_LOWPASS_CUTOFF, 
